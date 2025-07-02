@@ -7,7 +7,7 @@ How to use :
 2. Make sure to have gcc installed in your system 
    To verify run : gcc in the terminal u should be seeing something like : gcc: fatal error: no input files compilation terminated.
 
-3. Tweaking parameters: (Optional)
+3. Tweaking parameters: (Optional)<br>
     #define HiddenLayer1_Size 32 //recommended upper limit is 32 , lower limit is 10 <br>
     float learning_rate =0.1; // upper limit is 1 , lower limit is 0.01 <br>
     #define Epochs 1000 // recommended upper limit is 1000 , lower limit is 1 <br>
