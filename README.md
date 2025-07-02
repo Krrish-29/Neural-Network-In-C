@@ -17,4 +17,6 @@ How to use :
     changing the above values higher or lower than mentioned will lead to errors.
     Other than parameter mention should not be changed for error free results. 
 4. compile the file : gcc -g -O0 -Wall -fsanitize=address -o image image.c -lm
-5. run the exe : ./image 
+5. run the exe : ./image
+6. Select 1 or training at start for warming up as some important files are created during training procedure. 
+7. Then 2 or inference afterwards for analyzing performace.  
