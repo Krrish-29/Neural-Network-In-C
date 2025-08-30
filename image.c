@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <omp.h>
 #include <time.h>
 #include <math.h>
 #define HiddenLayer1_Size 32 //lower limit is 10
 float learning_rate =0.1;
-#define Epochs 1000 
-#define training_images 1000 //upper limit is 60000
-#define inference_images 1000 //upper limit is 10000
+#define Epochs 100
+#define training_images 60000 //upper limit is 60000
+#define inference_images 10000 //upper limit is 10000
 
 
 #define Input_Size 28 //do not chnage
@@ -85,17 +86,29 @@ void initalize_matrices_backward(Backward_Matrices *backward,int no_of_images){
         backward->A1_T[i]=(float*)calloc(HiddenLayer1_Size,sizeof(float));
     }
 }
+
+
 void matrix_multiply(float **output,float **weight,float **input,int row1,int col1,int row2,int col2){
-    for(int i=0;i<row1;i++){
-        for(int j=0;j<col2;j++){
-            output[i][j]=0;
-            for(int k=0;k<col1;k++){
-                output[i][j]+=(weight[i][k]*input[k][j]);
-            }
+    // for(int i=0;i<row1;i++){
+        //     for(int j=0;j<col2;j++){
+            //         output[i][j]=0;
+            //         for(int k=0;k<col1;k++){
+                //             output[i][j]+=(weight[i][k]*input[k][j]);
+                //         }
+                //     }
+                // }
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < row1; ++i){
+        for (int j = 0; j < col2; ++j) {
+            float sum = 0;
+            for (int k = 0; k < col1; ++k)
+                sum += weight[i][k] * input[k][j];
+            output[i][j] = sum;
         }
     }
 }
 void bias_addition(float **input,float *bias,int row,int col){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<row;i++){
         for(int j=0;j<col;j++){
             input[i][j]+=bias[i];
@@ -103,6 +116,7 @@ void bias_addition(float **input,float *bias,int row,int col){
     }
 }
 void matrix_subtraction(float **output,float **input1,float **input2,int row,int col){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<row;i++){
         for(int j=0;j<col;j++){
             output[i][j]=input1[i][j]-input2[i][j];
@@ -110,6 +124,7 @@ void matrix_subtraction(float **output,float **input1,float **input2,int row,int
     }
 }
 void ReLU(float **output,float **input,int row,int col){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<row;i++){
         for(int j=0;j<col;j++){
             if(input[i][j]<=0) output[i][j]=0;
@@ -118,6 +133,7 @@ void ReLU(float **output,float **input,int row,int col){
     }
 }
 void SoftMax(float **output,float **input,int row,int col){
+    #pragma omp parallel for collapse(1)
     for(int j=0;j<col;j++){
         float sum=0;
         float maxval=input[0][j];
@@ -134,6 +150,7 @@ void SoftMax(float **output,float **input,int row,int col){
     }
 }
 void ReLU_Derivative(float **gradient,int row,int col){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<row;i++){
         for(int j=0;j<col;j++){
             if(gradient[i][j]<0) gradient[i][j]=0;
@@ -142,6 +159,7 @@ void ReLU_Derivative(float **gradient,int row,int col){
     }
 }
 void elementwise_matrix_multiply(float **output,float **input,int row,int col){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<row;i++){
         for(int j=0;j<col;j++){
             output[i][j]*=(input[i][j]);
@@ -158,11 +176,13 @@ void forward_proporgation(Forward_Matrices *forward,int no_of_images){
 
 }
 void backward_proporgation(Forward_Matrices *forward,Backward_Matrices *backward,int no_of_images){
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j=0;j<no_of_images;j++){
             backward->A1_T[j][i]=forward->A1[i][j];
         }
     }
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<Output_Size;i++){
         for(int j=0;j<HiddenLayer1_Size;j++){
             backward->W2_T[j][i]=forward->W2[i][j];
@@ -170,31 +190,34 @@ void backward_proporgation(Forward_Matrices *forward,Backward_Matrices *backward
     }
     matrix_subtraction(backward->dZ2,forward->A2,forward->labels,Output_Size,no_of_images);
     matrix_multiply(backward->dW2,backward->dZ2,backward->A1_T,Output_Size,no_of_images,no_of_images,HiddenLayer1_Size);
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<Output_Size;i++){
         for(int j=0;j<HiddenLayer1_Size;j++){
             backward->dW2[i][j]/=no_of_images;
         }
     }
+    
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<Output_Size;i++){
         for(int j=0;j<no_of_images;j++){
-            backward->dB2[i]+=backward->dZ2[i][j];
+            backward->dB2[i]+=(backward->dZ2[i][j]/(float)no_of_images);
         }
-        backward->dB2[i]/=(float)no_of_images;
     }
     matrix_multiply(backward->dZ1,backward->W2_T,backward->dZ2,HiddenLayer1_Size,Output_Size,Output_Size,no_of_images);
     ReLU_Derivative(forward->Z1,HiddenLayer1_Size,no_of_images);
     elementwise_matrix_multiply(backward->dZ1,forward->Z1,HiddenLayer1_Size,no_of_images);
     matrix_multiply(backward->dW1,backward->dZ1,forward->X,HiddenLayer1_Size,no_of_images,no_of_images,Input_Size*Input_Size);
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j=0;j<Input_Size*Input_Size;j++){
             backward->dW1[i][j]/=no_of_images;
         }
     }
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j=0;j<no_of_images;j++){
-            backward->dB1[i]+=backward->dZ1[i][j];
+            backward->dB1[i]+=(backward->dZ1[i][j]/(float)no_of_images);
         }
-        backward->dB1[i]/=(float)no_of_images;
     }
 }
 void update_parameter(Forward_Matrices *forward,Backward_Matrices *backward){
@@ -204,6 +227,7 @@ void update_parameter(Forward_Matrices *forward,Backward_Matrices *backward){
             forward->W1[i][j]=(forward->W1[i][j]-learning_rate*backward->dW1[i][j]);
         }
     }
+
     for(int i=0;i<Output_Size;i++){
         forward->B2[i]=(forward->B2[i]-learning_rate*backward->dB2[i]);
         for(int j=0;j<HiddenLayer1_Size;j++){
@@ -321,7 +345,7 @@ void reading_dataset(Forward_Matrices *forward,bool Training,bool Inference){
         forward->labels[curr_label][currimage]=1;
         
         fread(forward->input,sizeof(unsigned char),Input_Size*Input_Size,image);
-
+        #pragma omp parallel for collapse(2)
         for (int i = 0; i < 28; i++) {
             for (int j = 0; j < 28; j++) {
                 forward->X[currimage][i * 28 + j] = forward->input[i * 28 + j]/255.0f;
@@ -334,6 +358,38 @@ void reading_dataset(Forward_Matrices *forward,bool Training,bool Inference){
     fclose(image);
     fclose(label);
 }
+void Writing_Untrained_data(){
+//Generating initalize random bias and weights
+    srand(time(NULL));
+    
+    FILE *weight=fopen("weight.txt","w");
+    FILE *bias=fopen("bias.txt","w");
+    #pragma omp parallel for collapse(2)
+    for(int i=0;i<HiddenLayer1_Size;i++){
+        for(int j = 0; j < Input_Size*Input_Size; j++) {
+            float rand_float = ((float)rand() / RAND_MAX - 0.5f) * sqrtf(2.0f / (Input_Size * Input_Size));
+            fprintf(weight, "%.16f ", rand_float);
+        }
+    }
+    #pragma omp parallel for collapse(2)
+    for(int i = 0; i < Output_Size ; i++) {
+        for(int j=0;j< HiddenLayer1_Size ;j++){
+            float rand_float =  ((float)rand() / RAND_MAX - 0.5f) * sqrtf(2.0f / (HiddenLayer1_Size));
+            fprintf(weight, "%.16f ", rand_float);
+        }
+    }
+    #pragma omp parallel for collapse(1)
+    for(int i = 0; i < HiddenLayer1_Size ; i++) {
+        fprintf(bias, "%.16f\n", 0.0);
+    }
+    #pragma omp parallel for collapse(1)
+    for(int i = 0; i < Output_Size ; i++) {
+        fprintf(bias, "%.16f\n", 0.0);
+    }
+    
+    fclose(bias);
+    fclose(weight);
+}
 void read_weigths_bias(Forward_Matrices *forward){
     FILE *weight_=fopen("weight.txt","r");
     FILE *bias_=fopen("bias.txt","r");
@@ -342,11 +398,13 @@ void read_weigths_bias(Forward_Matrices *forward){
         exit(EXIT_FAILURE);
     }
     // initilaizing weigths 
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j = 0; j < Input_Size*Input_Size; j++) {
             fscanf(weight_, "%f", &forward->W1[i][j]);
         }
     }
+    #pragma omp parallel for collapse(2)
     for(int i=0;i<Output_Size;i++){
         for(int j = 0; j < HiddenLayer1_Size; j++) {
             fscanf(weight_, "%f", &forward->W2[i][j]);
@@ -354,9 +412,11 @@ void read_weigths_bias(Forward_Matrices *forward){
     }
     
     // initilaizing bias 
+    #pragma omp parallel for collapse(1)
     for(int i=0;i<HiddenLayer1_Size;i++){
         fscanf(bias_, "%f", &forward->B1[i]);
     }
+    #pragma omp parallel for collapse(1)
     for(int i=0;i<Output_Size;i++){
         fscanf(bias_, "%f", &forward->B2[i]);
     }
@@ -366,6 +426,7 @@ void read_weigths_bias(Forward_Matrices *forward){
 }
 int max(float **matrix,int col){
     float max=matrix[0][col],index=0;
+    #pragma omp parallel for collapse(1)
     for(int y=1;y<Output_Size;y++){
         if(matrix[y][col]>max){
             max=matrix[y][col];
@@ -396,47 +457,17 @@ void Training_Mode(){
     int no_of_images=training_images;
     initalize_matrices_forward(&forward,no_of_images);
     initalize_matrices_backward(&backward,no_of_images);
-    
-    //Generating initalize random bias and weights
-    // run this part only one time for clean start from ground up
-    
-    srand(time(NULL));
-    
-    FILE *weight=fopen("weight.txt","w");
-    FILE *bias=fopen("bias.txt","w");
-    
-    for(int i=0;i<HiddenLayer1_Size;i++){
-        for(int j = 0; j < Input_Size*Input_Size; j++) {
-            float rand_float = ((float)rand() / RAND_MAX - 0.5f) * sqrtf(2.0f / (Input_Size * Input_Size));
-            fprintf(weight, "%.16f ", rand_float);
-        }
-        fprintf(weight, "\n");
-    }
 
-    for(int i = 0; i < Output_Size ; i++) {
-        for(int j=0;j< HiddenLayer1_Size ;j++){
-            float rand_float =  ((float)rand() / RAND_MAX - 0.5f) * sqrtf(2.0f / (HiddenLayer1_Size));
-            fprintf(weight, "%.16f ", rand_float);
-        }
-        fprintf(weight, "\n");
-    }
+    // run this part only one time for clean start from ground up
+    Writing_Untrained_data();
     
-    for(int i = 0; i < HiddenLayer1_Size ; i++) {
-        fprintf(bias, "%.16f\n", 0.0);
-    }
-    for(int i = 0; i < Output_Size ; i++) {
-        fprintf(bias, "%.16f\n", 0.0);
-    }
-    
-    fclose(bias);
-    fclose(weight);
     read_weigths_bias(&forward);
     reading_dataset(&forward,true,false);
     printf("     ---- Training Started -----\n");
     for(int Epoch=0;Epoch<=Epochs;Epoch++){
         forward_proporgation(&forward,no_of_images);
 
-        if(Epoch%100==0){
+        if(Epoch%10==0){
             float Accuracy=0.0;
             float loss = 0.0;
             for(int x=0;x<no_of_images;x++){       
@@ -449,7 +480,7 @@ void Training_Mode(){
 
         backward_proporgation(&forward,&backward,no_of_images);
         update_parameter(&forward,&backward);
-        learning_rate *= 0.99f;
+        learning_rate=learning_rate*0.5*(1 + cos(M_PI*Epoch/Epochs));
     }
 
     Writing_Trained_data(&forward);
@@ -459,6 +490,7 @@ void Training_Mode(){
 }
 
 int main() {
+    omp_set_num_threads(4);
     clock_t start,end;
     start = clock();
     int mode=0;
