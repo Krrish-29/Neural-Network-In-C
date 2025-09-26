@@ -49,7 +49,7 @@ float learning_rate = 0.1;       // Recommended: 0.01 to 1
 
 4. Compile the Program
 bash
-gcc -g -O0 -Wall -fsanitize=address -o image image.c -lm
+gcc -g -O0 -Wall -fopenmp -fsanitize=address -o image image.c -lm
 5. Run the Program
 bash
 ./image
