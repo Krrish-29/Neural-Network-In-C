@@ -280,23 +280,36 @@ void Training_Mode(){
     // run this part only one time for clean start from ground up
     reading_dataset(true);
     initalize_weights_bias();
+    int correct=0;
     for(int Epoch=0;Epoch<Epochs;Epoch++){
         forward_proporgation();
         for(int j=0;j<training_images;j++){
-            printf("Image:%d\n",j);
-            for(int i=0;i<Output_Size;i++){
-                printf("%d:%.3f ",i,A2[i][j]);
+            int pred=0;
+            float maxv=A2[0][j];
+            // printf("Image:%d\n",j);
+            for(int i=1;i<Output_Size;i++){
+                if(A2[i][j] > maxv) {
+                    maxv = A2[i][j];
+                    pred = i;
+                }
+                // printf("%d:%.3f ",i,A2[i][j]);
             }
-            printf("\n");
-            for(int i=0;i<Output_Size;i++){
-                printf("%d:%.3f ",i,labels[i][j]);
+            // printf("\n");
+            int actual = 0;
+            for(int i = 0; i < Output_Size; i++) {
+                // printf("%d:%.3f ",i,labels[i][j]);
+                if(labels[i][j] == 1) {
+                    actual = i;
+                    break;
+                }
             }
-            printf("\n");
+            if(pred == actual) correct++;
+            // printf("\n");
         }
-
         backward_proporgation();
         update_parameter();
         learning_rate=learning_rate*0.5*(1 + cos(M_PI*Epoch/Epochs));
+        printf("Epoch %d | Accuracy: %.2f%%\n", Epoch,100.0f * correct / training_images);
     }
     Writing_Trained_data();
 }
