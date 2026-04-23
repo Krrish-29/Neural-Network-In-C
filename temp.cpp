@@ -9,7 +9,7 @@ using namespace std;
 
 float learning_rate =0.99;
 #define Epochs 1000
-#define training_images 32000 //upper limit is 60000
+#define training_images 3200 //upper limit is 60000
 #define batchSize 32
 #define HiddenLayer1_Size 32 //lower limit is 10
 
