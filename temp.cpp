@@ -4,37 +4,69 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <omp.h>
 using namespace std;
-float learning_rate =0.09;
+
+float learning_rate =0.99;
 #define Epochs 1000
-#define training_images 320 //upper limit is 60000
-// #define inference_images 10000 //upper limit is 10000
+#define training_images 32000 //upper limit is 60000
 #define batchSize 32
 #define HiddenLayer1_Size 32 //lower limit is 10
+
+#define inference_images 10000 //upper limit is 10000
+
 #define Input_Size 28 //do not chnage
 #define Output_Size 10 //do not change
 // Forward proporgation matrices
-vector<vector<float>> A0(Input_Size*Input_Size,vector<float>(training_images,0));
-vector<vector<float>> W1(HiddenLayer1_Size,vector<float>(Input_Size*Input_Size,0));
-vector<float> B1(HiddenLayer1_Size);
-vector<vector<float>> Z1(HiddenLayer1_Size,vector<float>(training_images,0));
-vector<vector<float>> A1(HiddenLayer1_Size,vector<float>(training_images,0));
-vector<vector<float>> W2(Output_Size,vector<float>(HiddenLayer1_Size,0));
-vector<float> B2(Output_Size);    
-vector<vector<float>> Z2(Output_Size,vector<float>(training_images,0));
-vector<vector<float>> A2(Output_Size,vector<float>(training_images,0));
-vector<vector<float>> labels(Output_Size,vector<float>(training_images,0));
+class Forward{
+public:
+    vector<vector<float>> A0;
+    vector<vector<float>> W1;
+    vector<float> B1;
+    vector<vector<float>> Z1;
+    vector<vector<float>> A1;
+    vector<vector<float>> W2;
+    vector<float> B2;
+    vector<vector<float>> Z2;
+    vector<vector<float>> A2;
+    vector<vector<float>> labels;
+    Forward(int images){
+        A0.resize(Input_Size*Input_Size,vector<float>(images,0));
+        W1.resize(HiddenLayer1_Size,vector<float>(Input_Size*Input_Size,0));
+        B1.resize(HiddenLayer1_Size);
+        Z1.resize(HiddenLayer1_Size,vector<float>(images,0));
+        A1.resize(HiddenLayer1_Size,vector<float>(images,0));
+        W2.resize(Output_Size,vector<float>(HiddenLayer1_Size,0));
+        B2.resize(Output_Size);    
+        Z2.resize(Output_Size,vector<float>(images,0));
+        A2.resize(Output_Size,vector<float>(images,0));
+        labels.resize(Output_Size,vector<float>(images,0));
+    }
+};
 // Backward proporgation matrices
-vector<vector<float>> dZ2(Output_Size,vector<float>(training_images,0));
-vector<vector<float>> dW2(Output_Size,vector<float>(HiddenLayer1_Size,0));
-vector<float> dB2(Output_Size);
-vector<vector<float>> dZ1(HiddenLayer1_Size,vector<float>(training_images,0));
-vector<vector<float>> dW1(HiddenLayer1_Size,vector<float>(Input_Size*Input_Size,0));
-vector<float> dB1(HiddenLayer1_Size);
-vector<vector<float>> W2_T(HiddenLayer1_Size,vector<float>(Output_Size,0));
-vector<vector<float>> A0_T(training_images,vector<float>(Input_Size*Input_Size,0));
-vector<vector<float>> A1_T(training_images,vector<float>(HiddenLayer1_Size,0));
-
+class Backward{
+public:
+    vector<vector<float>> dZ2;
+    vector<vector<float>> dW2;
+    vector<float> dB2;
+    vector<vector<float>> dZ1;
+    vector<vector<float>> dW1;
+    vector<float> dB1;
+    vector<vector<float>> W2_T;
+    vector<vector<float>> A0_T;
+    vector<vector<float>> A1_T;
+    Backward(int images){
+        dZ2.resize(Output_Size,vector<float>(images,0));
+        dW2.resize(Output_Size,vector<float>(HiddenLayer1_Size,0));
+        dB2.resize(Output_Size);
+        dZ1.resize(HiddenLayer1_Size,vector<float>(images,0));
+        dW1.resize(HiddenLayer1_Size,vector<float>(Input_Size*Input_Size,0));
+        dB1.resize(HiddenLayer1_Size);
+        W2_T.resize(HiddenLayer1_Size,vector<float>(Output_Size,0));
+        A0_T.resize(images,vector<float>(Input_Size*Input_Size,0));
+        A1_T.resize(images,vector<float>(HiddenLayer1_Size,0));
+    }
+};
 
 void matrix_multiply(vector<vector<float>>& output,vector<vector<float>>& weight,vector<vector<float>>& input,int start_row1,int end_row1,int start_col1,int end_col1,int start_col2,int end_col2){
     for(int i=start_row1;i<end_row1;i++){
@@ -45,7 +77,6 @@ void matrix_multiply(vector<vector<float>>& output,vector<vector<float>>& weight
             }
         }
     }
-    
 }
 void bias_addition(vector<vector<float>>& input,vector<float>& bias,int row,int start_col,int end_col){
     for(int i=0;i<row;i++){
@@ -78,13 +109,13 @@ void SoftMax(vector<vector<float>>& output,vector<vector<float>>& input,int row,
         }
     }
 }
-void forward_proporgation(int start,int end){
-    matrix_multiply(Z1,W1,A0,0,HiddenLayer1_Size,0,Input_Size*Input_Size,start,end);
-    bias_addition(Z1,B1,HiddenLayer1_Size,start,end);
-    ReLU(A1,Z1,HiddenLayer1_Size,start,end);
-    matrix_multiply(Z2,W2,A1,0,Output_Size,0,HiddenLayer1_Size,start,end);
-    bias_addition(Z2,B2,Output_Size,start,end);
-    SoftMax(A2,Z2,Output_Size,start,end); 
+void forward_proporgation(Forward *forward,int start,int end){
+    matrix_multiply(forward->Z1,forward->W1,forward->A0,0,HiddenLayer1_Size,0,Input_Size*Input_Size,start,end);
+    bias_addition(forward->Z1,forward->B1,HiddenLayer1_Size,start,end);
+    ReLU(forward->A1,forward->Z1,HiddenLayer1_Size,start,end);
+    matrix_multiply(forward->Z2,forward->W2,forward->A1,0,Output_Size,0,HiddenLayer1_Size,start,end);
+    bias_addition(forward->Z2,forward->B2,Output_Size,start,end);
+    SoftMax(forward->A2,forward->Z2,Output_Size,start,end); 
 }
 void matrix_subtraction(vector<vector<float>>& output,vector<vector<float>>& input1,vector<vector<float>>& input2,int row,int start_col,int end_col){
     for(int i=0;i<row;i++){
@@ -92,7 +123,6 @@ void matrix_subtraction(vector<vector<float>>& output,vector<vector<float>>& inp
             output[i][j]=input1[i][j]-input2[i][j];
         }
     }
-    
 }
 void ReLU_Derivative(vector<vector<float>>& gradient,int row,int start_col,int end_col){
     for(int i=0;i<row;i++){
@@ -110,71 +140,113 @@ void elementwise_matrix_multiply(vector<vector<float>>& output,vector<vector<flo
         }
 }
 
-void backward_proporgation(int start,int end){
+void backward_proporgation(Forward *forward,Backward *backward,int start,int end){
     
-    matrix_subtraction(dZ2,A2,labels,Output_Size,start,end);
+    matrix_subtraction(backward->dZ2,forward->A2,forward->labels,Output_Size,start,end);
 
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j=start;j<end;j++){
-            A1_T[j][i]=A1[i][j];
+            backward->A1_T[j][i]=forward->A1[i][j];
         }
     }
     
-    matrix_multiply(dW2,dZ2,A1_T,0,Output_Size,start,end,0,HiddenLayer1_Size);
+    matrix_multiply(backward->dW2,backward->dZ2,backward->A1_T,0,Output_Size,start,end,0,HiddenLayer1_Size);
 
     for(int i=0;i<Output_Size;i++){
         for(int j=0;j<HiddenLayer1_Size;j++){
-            dW2[i][j]/=batchSize;
+            backward->dW2[i][j]/=batchSize;
         }
     }
 
     for(int i=0;i<Output_Size;i++){
-        dB2[i]=0;
+        backward->dB2[i]=0;
         for(int j=start;j<end;j++){
-            dB2[i]+=(dZ2[i][j]/batchSize);
+            backward->dB2[i]+=(backward->dZ2[i][j]/batchSize);
         }
     }
 
     for(int i=0;i<Output_Size;i++){
         for(int j=0;j<HiddenLayer1_Size;j++){
-            W2_T[j][i]=W2[i][j];
+            backward->W2_T[j][i]=forward->W2[i][j];
         }
     }
 
-    matrix_multiply(dZ1,W2_T,dZ2,0,HiddenLayer1_Size,0,Output_Size,start,end);
-    ReLU_Derivative(Z1,HiddenLayer1_Size,start,end);
-    elementwise_matrix_multiply(dZ1,Z1,HiddenLayer1_Size,start,end);
-    matrix_multiply(dW1,dZ1,A0_T,0,HiddenLayer1_Size,start,end,0,Input_Size*Input_Size);
+    matrix_multiply(backward->dZ1,backward->W2_T,backward->dZ2,0,HiddenLayer1_Size,0,Output_Size,start,end);
+    ReLU_Derivative(forward->Z1,HiddenLayer1_Size,start,end);
+    elementwise_matrix_multiply(backward->dZ1,forward->Z1,HiddenLayer1_Size,start,end);
+    matrix_multiply(backward->dW1,backward->dZ1,backward->A0_T,0,HiddenLayer1_Size,start,end,0,Input_Size*Input_Size);
+
     int currBatchSize=end-start;
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j=0;j<Input_Size*Input_Size;j++){
-            dW1[i][j]/=currBatchSize;
+            backward->dW1[i][j]/=currBatchSize;
         }
     }
     for(int i=0;i<HiddenLayer1_Size;i++){
-        dB1[i]=0;
+        backward->dB1[i]=0;
         for(int j=start;j<end;j++){
-            dB1[i]+=(dZ1[i][j]/currBatchSize);
+            backward->dB1[i]+=(backward->dZ1[i][j]/currBatchSize);
         }
     }
 }
-void update_parameter(int start,int end){
+void update_parameter(Forward *forward,Backward *backward,int start,int end){
     for(int i=0;i<HiddenLayer1_Size;i++){
-        B1[i]=(B1[i]-learning_rate*dB1[i]);
+        forward->B1[i]=(forward->B1[i]-learning_rate*backward->dB1[i]);
         for(int j=0;j<Input_Size*Input_Size;j++){
-            W1[i][j]=(W1[i][j]-learning_rate*dW1[i][j]);
+            forward->W1[i][j]=(forward->W1[i][j]-learning_rate*backward->dW1[i][j]);
         }
     }
 
     for(int i=0;i<Output_Size;i++){
-        B2[i]=(B2[i]-learning_rate*dB2[i]);
+        forward->B2[i]=(forward->B2[i]-learning_rate*backward->dB2[i]);
         for(int j=0;j<HiddenLayer1_Size;j++){
-            W2[i][j]=(W2[i][j]-learning_rate*dW2[i][j]);
+            forward->W2[i][j]=(forward->W2[i][j]-learning_rate*backward->dW2[i][j]);
         }
     }
 }
-
-void Writing_Trained_data(){
+int max(vector<vector<float>> &matrix,int col){
+    float max=matrix[0][col],index=0;
+    for(int y=1;y<Output_Size;y++){
+        if(matrix[y][col]>max){
+            max=matrix[y][col];
+            index=y;
+        }
+    }
+    return index;
+}
+void read_weights_bias(Forward *forward){
+    FILE *weight=fopen("weight.txt","r");
+    FILE *bias=fopen("bias.txt","r");
+    if (!weight||!bias) {
+        printf("Error opening file.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    // initilaizing weigths 
+    for(int i=0;i<HiddenLayer1_Size;i++){
+        for(int j = 0; j < Input_Size*Input_Size; j++) {
+            fscanf(weight, "%f", &forward->W1[i][j]);
+        }
+    }
+    
+    for(int i=0;i<Output_Size;i++){
+        for(int j = 0; j < HiddenLayer1_Size; j++) {
+            fscanf(weight, "%f", &forward->W2[i][j]);
+        }
+    }
+    
+    // initilaizing bias 
+    for(int i=0;i<HiddenLayer1_Size;i++){
+        fscanf(bias, "%f", &forward->B1[i]);
+    }
+    for(int i=0;i<Output_Size;i++){
+        fscanf(bias, "%f", &forward->B2[i]);
+    }
+    
+    fclose(bias);
+    fclose(weight);
+}
+void Writing_Trained_data(Forward *forward){
     //writing data to files
     FILE *weight=fopen("weight.txt","w");
     FILE *bias=fopen("bias.txt","w");
@@ -185,29 +257,60 @@ void Writing_Trained_data(){
 
     for(int i=0;i<HiddenLayer1_Size;i++){
         for(int j = 0; j < Input_Size*Input_Size; j++) {
-            fprintf(weight, "%.16f ", W1[i][j]);
+            fprintf(weight, "%.16f ", forward->W1[i][j]);
         }
     }
     for(int i = 0; i < Output_Size ; i++) {
         for(int j=0;j< HiddenLayer1_Size ;j++){
-            fprintf(weight, "%.16f ", W2[i][j]);
+            fprintf(weight, "%.16f ", forward->W2[i][j]);
         }
     }
 
     for(int i=0;i<HiddenLayer1_Size;i++){
-        fprintf(bias, "%.16f ", B1[i]);
+        fprintf(bias, "%.16f ", forward->B1[i]);
     }
     for(int i=0;i<Output_Size;i++){
-        fprintf(bias, "%.16f ", B2[i]);
+        fprintf(bias, "%.16f ", forward->B2[i]);
     }   
     fclose(weight);
     fclose(bias);
 } 
-void reading_dataset(){
-    FILE *image=NULL ;
-    FILE *label=NULL ;
-    image = fopen("train-images-idx3-ubyte","rb");
-    label = fopen("train-labels-idx1-ubyte","rb");
+void initalize_weights_bias(Forward *forward){
+    //Generating initalize random bias and weights
+    srand(time(NULL));
+    
+    //initalize weights
+    for(int i=0;i<HiddenLayer1_Size;i++){
+        for(int j = 0; j < Input_Size*Input_Size; j++) {
+            forward->W1[i][j]=((float)rand() / (float)RAND_MAX - 0.5f) * sqrtf(2.0f / (Input_Size * Input_Size));
+        }
+    }
+
+    for(int i=0;i<Output_Size;i++){
+        for(int j = 0; j < HiddenLayer1_Size; j++) {
+            forward->W2[i][j]=((float)rand() / (float)RAND_MAX - 0.5f) * sqrtf(2.0f / (HiddenLayer1_Size));
+        }
+    }
+    
+    // initilaizing bias 
+    for(int i=0;i<HiddenLayer1_Size;i++){
+        forward->B1[i]=0.0;
+    }
+    for(int i=0;i<Output_Size;i++){
+        forward->B2[i]=0.0;
+    }
+}
+void reading_dataset(bool training,Forward *forward,Backward *backward=NULL){
+    FILE *image=NULL;
+    FILE *label=NULL;
+    if(training){
+        image = fopen("train-images-idx3-ubyte","rb");
+        label = fopen("train-labels-idx1-ubyte","rb");
+    }
+    else {
+        image = fopen("t10k-images-idx3-ubyte","rb");
+        label = fopen("t10k-labels-idx1-ubyte","rb");
+    }
 
     if (!image||!label) {
         printf("Error opening file \nTraining Failed.\n");
@@ -222,86 +325,70 @@ void reading_dataset(){
     for(int currimage=0;currimage<training_images;currimage++){ 
         // reading label
         fread(&curr_label,sizeof(unsigned char),1,label);
-        labels[curr_label][currimage]=1;
+        forward->labels[curr_label][currimage]=1;
         
         // reading dataset
         fread(input.data(),sizeof(unsigned char),Input_Size*Input_Size,image);
         for (int i = 0; i < 28; i++) {
             for (int j = 0; j < 28; j++) {
-                A0[i * 28 + j][currimage] = input[i * 28 + j]/255.0f;
-                A0_T[currimage][i * 28 + j] = input[i * 28 + j]/255.0f;
+                forward->A0[i * 28 + j][currimage] = input[i * 28 + j]/255.0f;
+                if(training) backward->A0_T[currimage][i * 28 + j] = input[i * 28 + j]/255.0f;
             }
         }
     }
     fclose(image);
     fclose(label);
 }
-void initalize_weights_bias(){
-    //Generating initalize random bias and weights
-    srand(time(NULL));
-    
-    //initalize weights
-    for(int i=0;i<HiddenLayer1_Size;i++){
-        for(int j = 0; j < Input_Size*Input_Size; j++) {
-            W1[i][j]=((float)rand() / (float)RAND_MAX - 0.5f) * sqrtf(2.0f / (Input_Size * Input_Size));
-        }
-    }
-
-    for(int i=0;i<Output_Size;i++){
-        for(int j = 0; j < HiddenLayer1_Size; j++) {
-            W2[i][j]=((float)rand() / (float)RAND_MAX - 0.5f) * sqrtf(2.0f / (HiddenLayer1_Size));
-        }
-    }
-    
-    // initilaizing bias 
-    for(int i=0;i<HiddenLayer1_Size;i++){
-        B1[i]=0.0;
-    }
-    for(int i=0;i<Output_Size;i++){
-        B2[i]=0.0;
-    }
-}
-
 void Training_Mode(){
     // run this part only one time for clean start from ground up
-    reading_dataset(true);
-    initalize_weights_bias();
+    Forward *forward=new Forward(training_images);
+    Backward *backward=new Backward(training_images);
+    reading_dataset(true,forward,backward);
+    initalize_weights_bias(forward);
+    printf("     ----- Traning Started -----\n");
     for(int Epoch=0;Epoch<Epochs;Epoch++){
-
+        printf("Epoch:%d/%d |",Epoch,Epochs);
+        
         for(int start=0;start<training_images;start+=batchSize){
-            printf("batch:%d",batch+1);
             int end=min(start+batchSize,training_images);
-            forward_proporgation(start,end);
-            backward_proporgation(start,end);
-            update_parameter(start,end);
+            forward_proporgation(forward,start,end);
+            backward_proporgation(forward,backward,start,end);
+            update_parameter(forward,backward,start,end);
         }
         learning_rate=learning_rate*0.5*(1 + cos(M_PI*Epoch/Epochs));
-
-        int correct=0;
-        for(int j=0;j<training_images;j++){
-            int pred=0;
-            float maxv=A2[0][j];
-            for(int i=1;i<Output_Size;i++){
-                if(A2[i][j] > maxv) {
-                    maxv = A2[i][j];
-                    pred = i;
-                }
-            }
-            int actual = 0;
-            for(int i = 0; i < Output_Size; i++) {
-                if(labels[i][j] == 1) {
-                    actual = i;
-                    break;
-                }
-            }
-            if(pred == actual) correct++;
+        
+        float Accuracy=0.0;
+        int predIdx,actualIdx;
+        for(int x=0;x<inference_images;x++){
+            predIdx=max(forward->A2,x);
+            actualIdx=max(forward->labels,x);
+            if(actualIdx==predIdx) Accuracy++;
+            else printf("     Wrong Prediction:-> \n     Sample Number :%d\n     Actual Value : %d\n     Model Prediction : %d\n\n",x+1,predIdx,actualIdx);
         }
-        printf("Epoch %d | Accuracy: %.2f%%\n", Epoch,100.0f * correct / training_images);
+        printf("Epoch: %d | Accuracy: %.2f%%\n", Epoch,100 * Accuracy / training_images);
     }
-
-    Writing_Trained_data();
+    printf("     ----- Training Completed! -----\n");
+    
+    Writing_Trained_data(forward);
 }
+void Inference_Mode(){
+    Forward *forward=new Forward(inference_images);
+    reading_dataset(false,forward);
+    read_weights_bias(forward);
 
+    printf("     ----- Inference Started -----\n");
+    forward_proporgation(forward,0,inference_images);
+    float Accuracy=0.0;
+    int predIdx,actualIdx;
+    for(int x=0;x<inference_images;x++){
+        predIdx=max(forward->A2,x);
+        actualIdx=max(forward->labels,x);
+        if(actualIdx==predIdx) Accuracy++;
+        else printf("     Wrong Prediction:-> \n     Sample Number :%d\n     Actual Value : %d\n     Model Prediction : %d\n\n",x+1,predIdx,actualIdx);
+    }
+    printf("     ----- Inference Completed! -----\n     Accuracy:%.2f\n",100*Accuracy/inference_images);
+}
 int main() {
-    Training_Mode();   
+    Training_Mode(); 
+    Inference_Mode();  
 } 
