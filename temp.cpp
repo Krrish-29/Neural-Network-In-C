@@ -6,9 +6,12 @@
 #include <ctime>
 #include <omp.h>
 using namespace std;
-
+// try to make arrays size in form of batch size rather than images
+// remove redundant arrys like A0_T
+// flatten the arrays
+// multi threading and making matrix multiply faster cblas
 float learning_rate =0.99;
-#define Epochs 1000
+#define Epochs 100
 #define training_images 32000 //upper limit is 60000
 #define batchSize 32
 #define HiddenLayer1_Size 32 //lower limit is 10
@@ -303,13 +306,16 @@ void initalize_weights_bias(Forward *forward){
 void reading_dataset(bool training,Forward *forward,Backward *backward=NULL){
     FILE *image=NULL;
     FILE *label=NULL;
+    int no_of_images;
     if(training){
         image = fopen("train-images-idx3-ubyte","rb");
         label = fopen("train-labels-idx1-ubyte","rb");
+        no_of_images=training_images;
     }
     else {
         image = fopen("t10k-images-idx3-ubyte","rb");
         label = fopen("t10k-labels-idx1-ubyte","rb");
+        no_of_images=inference_images;
     }
 
     if (!image||!label) {
@@ -322,7 +328,7 @@ void reading_dataset(bool training,Forward *forward,Backward *backward=NULL){
     unsigned char curr_label;
     vector<unsigned char> input(Input_Size*Input_Size,0);
 
-    for(int currimage=0;currimage<training_images;currimage++){ 
+    for(int currimage=0;currimage<no_of_images;currimage++){ 
         // reading label
         fread(&curr_label,sizeof(unsigned char),1,label);
         forward->labels[curr_label][currimage]=1;
@@ -359,7 +365,7 @@ void Training_Mode(){
         
         float Accuracy=0.0;
         int predIdx,actualIdx;
-        for(int x=0;x<inference_images;x++){
+        for(int x=0;x<training_images;x++){
             predIdx=max(forward->A2,x);
             actualIdx=max(forward->labels,x);
             if(actualIdx==predIdx) Accuracy++;
@@ -388,6 +394,7 @@ void Inference_Mode(){
     printf("     ----- Inference Completed! -----\n     Accuracy:%.2f\n",100*Accuracy/inference_images);
 }
 int main() {
+    omp_set_num_threads(4);
     Training_Mode(); 
     Inference_Mode();  
 } 
