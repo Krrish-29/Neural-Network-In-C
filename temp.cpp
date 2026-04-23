@@ -9,7 +9,7 @@ using namespace std;
 
 float learning_rate =0.99;
 #define Epochs 1000
-#define training_images 3200 //upper limit is 60000
+#define training_images 32000 //upper limit is 60000
 #define batchSize 32
 #define HiddenLayer1_Size 32 //lower limit is 10
 
@@ -363,7 +363,6 @@ void Training_Mode(){
             predIdx=max(forward->A2,x);
             actualIdx=max(forward->labels,x);
             if(actualIdx==predIdx) Accuracy++;
-            else printf("     Wrong Prediction:-> \n     Sample Number :%d\n     Actual Value : %d\n     Model Prediction : %d\n\n",x+1,predIdx,actualIdx);
         }
         printf("Epoch: %d | Accuracy: %.2f%%\n", Epoch,100 * Accuracy / training_images);
     }
