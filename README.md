@@ -1,82 +1,94 @@
-# Neural-Network-In-C
-🧠 Neural Network in C – MNIST From Scratch
-Welcome to my from-scratch implementation of a simple feedforward Neural Network in pure C, trained on the classic MNIST handwritten digits dataset.
+# 🧠 Neural Network in C/C++ — MNIST From Scratch
 
-This project is built on raw logic and math, without any high-level libraries or AI-generated code. Just me, VS Code, and a lot of hours debugging memory errors deep into the night. 🌙 Along the way, I gained a deep understanding of:
+A fully from-scratch implementation of a feedforward neural network trained on the MNIST handwritten digits dataset.
 
-🧩 Neural Network architecture and math
+This project focuses on understanding **how neural networks actually work under the hood**, by implementing everything manually — from matrix multiplication to backpropagation — without relying on high-level ML frameworks.
 
-🧠 Activation functions like ReLU and SoftMax
+---
 
-🧠 Gradients and backpropagation
+## 🚀 Highlights
 
-💾 Pointers, arrays, and dynamic memory allocation in C
+- 📦 End-to-end training and inference pipeline
+- 🧮 Manual implementation of:
+  - Forward propagation
+  - Backpropagation
+  - ReLU activation
+  - Softmax output layer
+- 📊 Mini-batch gradient descent
+- ⚡ Optimized matrix operations using **OpenBLAS (CBLAS)**
+- 🧵 Parallelism with OpenMP (where applicable)
+- 🧠 Achieves **>93% accuracy on MNIST**
+- 🔁 Significant improvement over previous version:
+  - Training accuracy: **~85% → 93%+**
+  - Inference accuracy: **~10–15% → 93%+**
 
-🚀 Features
-Full training and inference pipeline
+---
 
-Reads binary MNIST data files
+## 🧠 What I Learned
 
-Implements matrix operations, ReLU, SoftMax, and backpropagation by hand
+This project helped me build a deep understanding of:
 
-Configurable architecture with tunable parameters
+- Neural network fundamentals (forward/backward pass)
+- Gradient computation and optimization
+- Memory layout and cache efficiency
+- Performance trade-offs (naive loops vs BLAS)
+- Low-level debugging (segfaults, indexing, numerical stability)
 
-No third-party AI libraries involved—written completely from scratch
+---
 
-🛠️ How to Use
-1. Clone the Repository
+## 🛠️ Tech Stack
+
+- C / C++
+- OpenBLAS (CBLAS)
+- OpenMP
+- GCC / Clang
+
+---
+
+## ⚙️ Configuration
+
+You can tweak the model in `neural_network.cpp`:
+
+```cpp
+float learning_rate = 0.99;
+#define Epochs 100
+#define training_images 20000
+#define batchSize 32
+#define HiddenLayer1_Size 32
+#define inference_images 10000
+```
+
+## 🧪 Results
+128 hidden layer -> training - 99.97, inference - 97.99
+64 hidden layer -> training - 99.92, inference - 97.62
+32 hidden layer -> training - 99.37, inference - 96.63
+16 hidden layer -> training - 97.62, inference - 95.82
+10 hidden layer -> training - 95.39, inference - 94.28
+
+
+
+## Compile
 bash
-git clone https://github.com/Krrish-29/Neural-Network-In-C.git
-cd Neural-Network-In-C
-2. Verify You Have GCC Installed
+g++ -O3 -march=native -fopenmp neural_network.cpp -lopenblas -o neural_network
+
+Note: use clang for MacOS
+## Run
 bash
-gcc
-You should see something like:
+./neural_network
 
-gcc: fatal error: no input files
-compilation terminated.
+## 📈 Future Improvements
+Deeper architectures (multi-layer networks)
+SIMD/vectorization optimizations
+Better memory layout for cache efficiency
+Loss tracking & visualization
+GPU acceleration experiments
 
-3. (Optional) Tweak Parameters
-Modify the following values in image.c:
 
-c
-#define HiddenLayer1_Size 32     // Recommended: 10 to 32
-float learning_rate = 0.1;       // Recommended: 0.01 to 1
-#define Epochs 1000              // Recommended: 1 to 1000
-#define training_images 1000     // Recommended: 1 to 60000
-#define inference_images 1000    // Recommended: 1 to 10000
-⚠️ Do not exceed upper/lower bounds to avoid runtime errors. Other parts of the code should remain unchanged for stable execution.
+## 🤝 Contributions
 
-4. Compile the Program
-bash
-gcc -g -O0 -Wall -fopenmp -fsanitize=address -o image image.c -lm
-5. Run the Program
-bash
-./image
-6. Train the Network
-At the prompt, choose:
+Feel free to fork, experiment, or suggest improvements.
+This project is meant for learning and exploration.
 
-1 for Training mode
-This creates essential files required for future inference.
+## 🌟 Author
 
-7. Run Inference
-After training, run the program again and choose:
-
-2  for Inference mode
-This lets you test model accuracy and view predictions.
-
-📈 Roadmap
-This is just the beginning! I’ll be improving the architecture, experimenting with deeper layers, refining training logic, and exploring visualizations in upcoming iterations.
-
-📂 Dataset
-The model uses the MNIST dataset in raw binary format. Make sure the files are in the correct directory:
-
-train-images.idx3-ubyte
-train-labels.idx1-ubyte
-t10k-images.idx3-ubyte
-t10k-labels.idx1-ubyte
-🤝 Contributions & Feedback
-If you’re also diving into low-level machine learning or curious about how neural nets actually work under the hood—feel free to explore, fork, and share thoughts.
-
-🌟 Author
-Krrish – Proudly learning by doing. Built this with late-night debugging, real math, and a whole lot of curiosity.
+Krrish
